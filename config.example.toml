@@ -1,3 +1,7 @@
+[db]
+path = "./bolt.db"
+timeout = "1s"
+
 [telegram]
 token = "YOUR:TELEGRAMBOTTOKEN"
 timeout = 60
