@@ -18,6 +18,12 @@ deps:
 	$(info #Installing dependencies...)
 	go mod download
 
+# install project dependencies with tidy
+.PHONY: tidy
+tidy:
+	$(info #Installing dependencies and cleaning up...)
+	go mod tidy
+
 # run all tests
 .PHONY: test
 test: deps
