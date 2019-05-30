@@ -1,0 +1,15 @@
+[telegram]
+token = "YOUR:TELEGRAMBOTTOKEN"
+timeout = 60
+debug = false
+
+[commands]
+start = "/start"
+help = "/help"
+
+[messages]
+hello = "Hello!"
+help = "I'm here to help!"
+
+[errors]
+unknown = "Unknown error! Please contact the developer!"
