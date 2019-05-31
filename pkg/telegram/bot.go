@@ -28,6 +28,7 @@ func NewBot(ctx context.Context, cfg *viper.Viper) (*Bot, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to connect to Telegram")
 	}
+	_ = tgbotapi.SetLogger(log.WithField("source", "telegram-api"))
 	if cfg.GetBool("telegram.debug") {
 		log.Debug("Enabling debug mode for bot")
 		api.Debug = true
