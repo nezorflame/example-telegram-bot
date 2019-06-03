@@ -1,0 +1,19 @@
+[Unit]
+Description=Telegram example bot
+ConditionPathExists=/gopath/bin/example-telegram-bot
+After=network.target
+
+[Service]
+Type=simple
+User=youruser
+Group=youruser
+LimitNOFILE=1024
+
+Restart=on-failure
+RestartSec=10
+
+WorkingDirectory=/gopath/bin/
+ExecStart=/gopath/bin/example-telegram-bot --config=example-telegram-bot --log-level=INFO
+
+[Install]
+WantedBy=multi-user.target
