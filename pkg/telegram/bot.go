@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -42,7 +42,11 @@ func NewBot(ctx context.Context, cfg *viper.Viper) (*Bot, error) {
 func (b *Bot) Start() {
 	update := tgbotapi.NewUpdate(0)
 	update.Timeout = b.cfg.GetInt("telegram.timeout")
-	b.listen(b.api.GetUpdatesChan(update))
+	updates, err := b.api.GetUpdatesChan(update)
+	if err != nil {
+		log.WithError(err).Fatal("Unable to start listening to bot updates")
+	}
+	b.listen(updates)
 }
 
 // Stop stops the bot
