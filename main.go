@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/nezorflame/example-telegram-bot/internal/pkg/config"
 	"github.com/nezorflame/example-telegram-bot/internal/pkg/db"
@@ -54,7 +55,6 @@ func main() {
 	if err != nil {
 		log.WithError(err).Fatal("Unable to init DB")
 	}
-	defer dbInstance.Close(false)
 	log.Info("DB initiated")
 
 	// create bot
@@ -62,7 +62,6 @@ func main() {
 	if err != nil {
 		log.WithError(err).Fatal("Unable to create bot")
 	}
-	defer bot.Stop()
 	log.Info("Bot created")
 
 	// init graceful stop chan
@@ -77,6 +76,7 @@ func main() {
 		cancel()
 		bot.Stop()
 		dbInstance.Close(false)
+		time.Sleep(200 * time.Millisecond)
 		os.Exit(0)
 	}()
 

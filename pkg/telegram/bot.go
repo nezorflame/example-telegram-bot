@@ -66,6 +66,8 @@ func (b *Bot) listen(updates tgbotapi.UpdatesChannel) {
 		case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.help")):
 			log.WithField("user_id", u.Message.From.ID).Debug("Got help request")
 			go b.help(u.Message)
+			// case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.your_command")):
+			// go b.yourBotAction(u.Message)
 		}
 	}
 }

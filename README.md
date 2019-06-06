@@ -2,6 +2,8 @@
 
 Example bot template for Telegram.
 
+## Description
+
 With this type of setup all you need to do is:
 
 - `go get` the bot (or `git clone` it)
@@ -9,3 +11,29 @@ With this type of setup all you need to do is:
 - change the config file to your needs
 - modify `.service` file for systemd to manage your bot
 - deploy your bot to the server of choice, using modified config and service files
+
+## Dependencies
+
+This bot uses:
+
+- [tgbotapi](github.com/go-telegram-bot-api/telegram-bot-api) package to work with Telegram API
+- [bbolt](go.etcd.io/bbolt) for local database
+- [viper](github.com/spf13/viper) for configuration and [pflag](github.com/spf13/pflag) for command flags
+- [logrus](github.com/sirupsen/logrus) for logging
+
+## Structure
+
+This project adheres to the golang-standards [Standard Go Project Layout](https://github.com/golang-standards/project-layout) structure:
+
+- `internal/pkg` holds the private libraries:
+  - `config` for configuration
+  - `db` for database
+  - `file` for file and network helpers
+- `pkg` holds the public libraries (mainly `telegram` package with bot implementation)
+
+## Customization
+
+To add another custom command handler, you can:
+
+- add a command to `config.toml` (and also a corresponding message, if required)
+- edit `internal/pkg`
