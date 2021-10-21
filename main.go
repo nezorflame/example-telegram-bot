@@ -2,37 +2,44 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/nezorflame/example-telegram-bot/internal/pkg/bolt"
 	"github.com/nezorflame/example-telegram-bot/internal/pkg/config"
-	"github.com/nezorflame/example-telegram-bot/internal/pkg/db"
 	"github.com/nezorflame/example-telegram-bot/pkg/telegram"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
+	"github.com/sirupsen/logrus"
 )
 
-var configName string
+// Config flags.
+var (
+	configName  string
+	logrusLevel logrus.Level
+)
 
+// Init the flags.
 func init() {
-	// get flags, init logger
-	pflag.StringVar(&configName, "config", "config", "Config file name")
-	level := pflag.String("log-level", "INFO", "Logrus log level (DEBUG, WARN, etc.)")
-	pflag.Parse()
-
-	logLevel, err := log.ParseLevel(*level)
-	if err != nil {
-		log.WithError(err).Fatal("Unable to parse log level")
+	flag.StringVar(&configName, "config", "config", "Config file name")
+	logLevel := flag.String("log-level", "INFO", "Logrus log level (DEBUG, WARN, etc.)")
+	flag.Parse()
+	if logLevel == nil {
+		flag.PrintDefaults()
+		os.Exit(1)
 	}
-	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
-	log.SetOutput(os.Stdout)
-	log.SetLevel(logLevel)
+
+	var err error
+	if logrusLevel, err = logrus.ParseLevel(*logLevel); err != nil {
+		fmt.Printf("Log level '%s' is incorrect: %s\n", *logLevel, err)
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 
 	if configName == "" {
-		pflag.PrintDefaults()
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 }
@@ -42,8 +49,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// init config and tracing
-	log.Info("Starting the bot")
+	// init logger
+	log := &logrus.Logger{
+		Out:       os.Stdout,
+		Formatter: &logrus.TextFormatter{FullTimestamp: true},
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrusLevel,
+	}
+
+	// init config
 	cfg, err := config.New(configName)
 	if err != nil {
 		log.WithError(err).Fatal("Unable to parse config")
@@ -51,14 +65,15 @@ func main() {
 	log.Info("Config parsed")
 
 	// init DB
-	dbInstance, err := db.New(cfg.GetString("db.path"), cfg.GetDuration("db.timeout"))
+	db, err := bolt.New(cfg.GetString("db.path"), cfg.GetDuration("db.timeout"))
 	if err != nil {
 		log.WithError(err).Fatal("Unable to init DB")
 	}
 	log.Info("DB initiated")
+	defer db.Close(false)
 
 	// create bot
-	bot, err := telegram.NewBot(ctx, cfg)
+	bot, err := telegram.NewBot(cfg, log)
 	if err != nil {
 		log.WithError(err).Fatal("Unable to create bot")
 	}
@@ -66,21 +81,24 @@ func main() {
 
 	// init graceful stop chan
 	log.Debug("Initiating system signal watcher")
-	var gracefulStop = make(chan os.Signal)
+	gracefulStop := make(chan os.Signal, 1)
 	signal.Notify(gracefulStop, syscall.SIGTERM)
 	signal.Notify(gracefulStop, syscall.SIGINT)
 
-	go func() {
-		sig := <-gracefulStop
-		log.Warnf("Caught sig %+v, stopping the app", sig)
-		cancel()
-		bot.Stop()
-		dbInstance.Close(false)
-		time.Sleep(200 * time.Millisecond)
-		os.Exit(0)
-	}()
-
 	// start the bot
 	log.Info("Starting the bot")
-	bot.Start()
+	bot.Start(ctx)
+	log.Info("Started the bot, listening to the updates...")
+	defer bot.Stop()
+
+	// watch context and syscalls
+	select {
+	case sig := <-gracefulStop:
+		log.Warnf("Caught sig %+v, stopping the app", sig)
+		cancel()
+		return
+	case <-ctx.Done():
+		log.Warnf("Context closed (%s), exiting application", ctx.Err())
+		return
+	}
 }

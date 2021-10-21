@@ -2,31 +2,32 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/pkg/errors"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 // Bot describes Telegram bot
 type Bot struct {
-	ctx context.Context
 	api *tgbotapi.BotAPI
 	cfg *viper.Viper
+	log *logrus.Logger
 }
 
 // NewBot creates new instance of Bot
-func NewBot(ctx context.Context, cfg *viper.Viper) (*Bot, error) {
+func NewBot(cfg *viper.Viper, log *logrus.Logger) (*Bot, error) {
 	if cfg == nil {
 		return nil, errors.New("empty config")
 	}
 
 	api, err := tgbotapi.NewBotAPI(cfg.GetString("telegram.token"))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to connect to Telegram")
+		return nil, fmt.Errorf("unable to connect to Telegram: %w", err)
 	}
 	_ = tgbotapi.SetLogger(log.WithField("source", "telegram-api"))
 	if cfg.GetBool("telegram.debug") {
@@ -35,18 +36,15 @@ func NewBot(ctx context.Context, cfg *viper.Viper) (*Bot, error) {
 	}
 
 	log.Debugf("Authorized on account %s", api.Self.UserName)
-	return &Bot{api: api, cfg: cfg, ctx: ctx}, nil
+	return &Bot{api: api, cfg: cfg, log: log}, nil
 }
 
 // Start starts to listen the bot updates channel
-func (b *Bot) Start() {
+func (b *Bot) Start(ctx context.Context) {
 	update := tgbotapi.NewUpdate(0)
 	update.Timeout = b.cfg.GetInt("telegram.timeout")
-	updates, err := b.api.GetUpdatesChan(update)
-	if err != nil {
-		log.WithError(err).Fatal("Unable to start listening to bot updates")
-	}
-	b.listen(updates)
+	updates := b.api.GetUpdatesChan(update)
+	go b.listen(ctx, updates)
 }
 
 // Stop stops the bot
@@ -54,20 +52,26 @@ func (b *Bot) Stop() {
 	b.api.StopReceivingUpdates()
 }
 
-func (b *Bot) listen(updates tgbotapi.UpdatesChannel) {
-	for u := range updates {
-		if u.Message == nil { // ignore any non-Message Updates
-			continue
-		}
+func (b *Bot) listen(ctx context.Context, updates tgbotapi.UpdatesChannel) {
+	for {
+		select {
+		case <-ctx.Done():
+			b.log.Warning("Context closed - stopping listening to the updates: %w", ctx.Err())
+			return
+		case u := <-updates:
+			if u.Message == nil { // ignore any non-Message updates
+				continue
+			}
 
-		switch {
-		case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.start")):
-			go b.hello(u.Message)
-		case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.help")):
-			log.WithField("user_id", u.Message.From.ID).Debug("Got help request")
-			go b.help(u.Message)
-			// case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.your_command")):
-			// go b.yourBotAction(u.Message)
+			switch {
+			case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.start")):
+				go b.hello(u.Message)
+			case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.help")):
+				log.WithField("user_id", u.Message.From.ID).Debug("Got help request")
+				go b.help(u.Message)
+				// case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.your_command")):
+				// go b.yourBotAction(u.Message)
+			}
 		}
 	}
 }

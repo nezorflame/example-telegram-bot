@@ -23,11 +23,11 @@ This bot uses:
 
 ## Structure
 
-This project adheres to the golang-standards [Standard Go Project Layout](https://github.com/golang-standards/project-layout) structure:
+This project mostly adheres to the [Project Layout](https://github.com/golang-standards/project-layout) structure:
 
 - `internal/pkg` holds the private libraries:
   - `config` for configuration
-  - `db` for database
+  - `bolt` for database (using BoltDB)
   - `file` for file and network helpers
 - `pkg` holds the public libraries (mainly `telegram` package with bot implementation)
 
@@ -39,4 +39,5 @@ To add another custom command handler, you can:
 - edit `internal/pkg`
 
 ## License
+
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot?ref=badge_large)

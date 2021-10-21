@@ -1,15 +1,14 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
 const (
-	msgEmptyValue = "empty config value '%s'"
-
 	defaultDBPath          = "./bolt.db"
 	defaultDBTimeout       = time.Second
 	defaultTelegramTimeout = 60
@@ -40,7 +39,7 @@ func New(name string) (*viper.Viper, error) {
 	cfg.AddConfigPath(".")
 
 	if err := cfg.ReadInConfig(); err != nil {
-		return nil, errors.Wrap(err, "unable to read config")
+		return nil, fmt.Errorf("unable to read config: %w", err)
 	}
 	cfg.WatchConfig()
 
@@ -50,7 +49,7 @@ func New(name string) (*viper.Viper, error) {
 	cfg.SetDefault("telegram.debug", defaultTelegramDebug)
 
 	if err := validateConfig(cfg); err != nil {
-		return nil, errors.Wrap(err, "unable to validate config")
+		return nil, fmt.Errorf("unable to validate config: %w", err)
 	}
 
 	return cfg, nil
@@ -63,16 +62,16 @@ func validateConfig(cfg *viper.Viper) error {
 
 	for _, p := range mandatoryParams {
 		if cfg.Get(p) == nil {
-			return errors.Errorf(msgEmptyValue, p)
+			return fmt.Errorf("empty config value '%s'", p)
 		}
 	}
 
 	if cfg.GetDuration("db.timeout") <= 0 {
-		return errors.Errorf("'db.timeout' should be greater than 0")
+		return errors.New("'db.timeout' should be greater than 0")
 	}
 
 	if cfg.GetDuration("telegram.timeout") <= 0 {
-		return errors.Errorf("'telegram.timeout' should be greater than 0")
+		return errors.New("'telegram.timeout' should be greater than 0")
 	}
 
 	return nil

@@ -1,11 +1,12 @@
-package db
+package bolt
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"sort"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.etcd.io/bbolt"
 )
@@ -34,7 +35,7 @@ func New(path string, timeout time.Duration) (*DB, error) {
 	}
 	b, err := bbolt.Open(path, 0755, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open DB")
+		return nil, fmt.Errorf("unable to open DB: %w", err)
 	}
 
 	// create global bucket if it doesn't exist yet
@@ -44,7 +45,7 @@ func New(path string, timeout time.Duration) (*DB, error) {
 		return bErr
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create global bucket")
+		return nil, fmt.Errorf("unable to create global bucket: %w", err)
 	}
 
 	// return the DB
@@ -71,11 +72,11 @@ func (db *DB) Close(delete bool) error {
 	select {
 	case err := <-done:
 		if err != nil {
-			return errors.Wrap(err, "unable to close DB")
+			return fmt.Errorf("unable to close DB: %w", err)
 		}
 		return nil
 	case <-timer.C:
-		return errors.Wrap(bbolt.ErrTimeout, "unable to close DB")
+		return fmt.Errorf("unable to close DB: %w", bbolt.ErrTimeout)
 	}
 }
 
@@ -96,7 +97,7 @@ func (db *DB) Keys() ([]string, error) {
 		})
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get the list of keys from DB")
+		return nil, fmt.Errorf("unable to get the list of keys from DB: %w", err)
 	}
 	sort.Strings(keys)
 	return keys, nil
@@ -122,7 +123,7 @@ func (db *DB) Get(key string) ([]byte, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get value for key '%s' from DB")
+		return nil, fmt.Errorf("unable to get value for key '%s' from DB: %w", key, err)
 	}
 	log.WithField("key", key).Debug("Got the value")
 	return value, nil
@@ -139,7 +140,7 @@ func (db *DB) Put(key string, val []byte) error {
 		return b.Put([]byte(key), val)
 	})
 	if err != nil {
-		return errors.Wrapf(err, "unable to put value for key '%s' to DB", key)
+		return fmt.Errorf("unable to put value for key '%s' to DB: %w", key, err)
 	}
 	return nil
 }
@@ -155,7 +156,7 @@ func (db *DB) Delete(key string) error {
 		return b.Delete([]byte(key))
 	})
 	if err != nil {
-		return errors.Wrapf(err, "unable to delete value for key '%s' from DB", key)
+		return fmt.Errorf("unable to delete value for key '%s' from DB: %w", key, err)
 	}
 	return nil
 }
@@ -166,7 +167,7 @@ func (db *DB) Purge() error {
 		return tx.DeleteBucket(bucketName)
 	})
 	if err != nil {
-		return errors.Wrap(err, "unable to purge global bucket from DB")
+		return fmt.Errorf("unable to purge global bucket from DB: %w", err)
 	}
 	return nil
 }
