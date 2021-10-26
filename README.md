@@ -18,7 +18,7 @@ This bot uses:
 
 - [tgbotapi](github.com/go-telegram-bot-api/telegram-bot-api) package to work with Telegram API
 - [bbolt](go.etcd.io/bbolt) for local database
-- [viper](github.com/spf13/viper) for configuration and [pflag](github.com/spf13/pflag) for command flags
+- [viper](github.com/spf13/viper) for configuration
 - [logrus](github.com/sirupsen/logrus) for logging
 
 ## Structure
