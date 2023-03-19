@@ -1,0 +1,86 @@
+# More info on config here: https://github.com/golangci/golangci-lint#config-file
+run:
+  deadline: 10m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - bin
+    - vendor
+    - var
+    - tmp
+    - internal/generated
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  govet:
+    check-shadowing: true
+  dupl:
+    threshold: 100
+
+linters:
+  disable-all: true
+  enable:
+    - revive
+    - govet
+    - errcheck
+    - ineffassign
+    - typecheck
+    - goconst
+    - gosec
+    - goimports
+    - gosimple
+    - unused
+    - staticcheck
+    - makezero
+    - whitespace
+    # - dupl # - it's very slow, enable if you really know why you need it
+
+issues:
+  # Independently from option `exclude` we use default exclude patterns,
+  # it can be disabled by this option. To list all
+  # excluded by default patterns execute `golangci-lint run --help`.
+  # Default value for this option is true.
+  exclude-use-default: false
+  # List of regexps of issue texts to exclude, empty list by default.
+  # But independently from this option we use default exclude patterns,
+  # it can be disabled by `exclude-use-default: false`. To list all
+  # excluded by default patterns execute `golangci-lint run --help`
+  exclude:
+    # _ instead of err checks
+    - G104
+    # Close() on types - make sure to know when it's OK to ignore!
+    - G307
+    # for "public interface + private struct implementation" cases only!
+    - "unexported-return: exported func .* returns unexported type .*, which can be annoying to use"
+    # can be removed in the development phase
+    - (comment on exported (method|function|type|const|var)|should have( a package)? comment|comment should be of the form)
+    # not for the active development - can be removed in the stable phase
+    - should have a package comment, unless it's in another file for this package
+    - don't use an underscore in package name
+    # errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
+    - should check returned error before deferring
+    - "Error return value of `.*(Close|Remove)` is not checked"
+    - "string `test` has * occurrences, make it a constant"
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: test/.*\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - govet

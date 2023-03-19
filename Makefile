@@ -1,5 +1,6 @@
 CMD:=example-telegram-bot
-PKG_LIST:=$(shell go list ./...)
+MODULE:=github.com/nezorflame/$(CMD)
+PKG_LIST:=$(shell go list -f '{{.Dir}}' ./...)
 GIT_HASH?=$(shell git log --format="%h" -n 1 2> /dev/null)
 GIT_BRANCH?=$(shell git branch 2> /dev/null | grep '*' | cut -f2 -d' ')
 GIT_TAG:=$(shell git describe --exact-match --abbrev=0 --tags 2> /dev/null)
@@ -12,6 +13,9 @@ export GOPROXY=https://proxy.golang.org
 BUILD_ENVPARMS:=CGO_ENABLED=0
 BUILD_TS:=$(shell date +%FT%T%z)
 
+PWD:=$(PWD)
+export PATH:=$(PWD)/bin:$(PATH)
+
 # install project dependencies
 .PHONY: deps
 deps:
@@ -23,6 +27,29 @@ deps:
 tidy:
 	$(info #Installing dependencies and cleaning up...)
 	go mod tidy
+
+.PHONY: update
+update:
+	$(info #Updating dependencies...)
+	go get -d -mod= -u
+
+.PHONY: generate
+generate:
+	$(info #Generating code...)
+	go generate ./...
+
+.PHONY: imports
+imports:
+	$(info #Formatting code imports...)
+	gosimports -local $(MODULE) -w $(PKG_LIST)
+
+.PHONY: format
+format: imports
+	$(info #Formatting code...)
+	gofumpt -w $(PKG_LIST)
+
+.PHONY: refresh
+refresh: generate format deps
 
 # run all tests
 .PHONY: test
@@ -39,7 +66,7 @@ test-cover: deps
 	rm -f coverage.out
 	
 .PHONY: fast-build
-fast-build: deps
+fast-build: deps 
 	$(info #Building binaries...)
 	$(shell $(BUILD_ENVPARMS) go build -o bin/$(CMD) .)
 	@echo
@@ -52,3 +79,15 @@ install: deps
 	$(info #Installing binaries...)
 	$(shell $(BUILD_ENVPARMS) go install .)
 	@echo
+
+# install tools binary: linter, mockgen, etc.
+.PHONY: tools
+tools:
+	$(info #Installing tools...)
+	cd tools && go generate -tags tools
+
+# run linter
+.PHONY: lint
+lint:
+	$(info #Running lint...)
+	golangci-lint run ./...

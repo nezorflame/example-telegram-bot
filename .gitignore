@@ -11,6 +11,10 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Go workspace files
+go.work
+go.work.sum
+
 # Vendor, config, DB, binaries, etc
 .idea/
 .vscode/

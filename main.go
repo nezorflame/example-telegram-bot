@@ -8,17 +8,17 @@ import (
 	"os/signal"
 	"syscall"
 
+	"golang.org/x/exp/slog"
+
 	"github.com/nezorflame/example-telegram-bot/internal/pkg/bolt"
 	"github.com/nezorflame/example-telegram-bot/internal/pkg/config"
 	"github.com/nezorflame/example-telegram-bot/pkg/telegram"
-
-	"github.com/sirupsen/logrus"
 )
 
 // Config flags.
 var (
-	configName  string
-	logrusLevel logrus.Level
+	configName string
+	slogLevel  slog.Level
 )
 
 // Init the flags.
@@ -31,8 +31,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	var err error
-	if logrusLevel, err = logrus.ParseLevel(*logLevel); err != nil {
+	if err := slogLevel.UnmarshalText([]byte(*logLevel)); err != nil {
 		fmt.Printf("Log level '%s' is incorrect: %s\n", *logLevel, err)
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -50,32 +49,48 @@ func main() {
 	defer cancel()
 
 	// init logger
-	log := &logrus.Logger{
-		Out:       os.Stdout,
-		Formatter: &logrus.TextFormatter{FullTimestamp: true},
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrusLevel,
+	slogOptions := slog.HandlerOptions{
+		AddSource: true,
+		Level:     slogLevel,
 	}
+	log := slog.New(slogOptions.NewTextHandler(os.Stdout))
+
+	// error reporting
+	var err error
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			log.Error("Got a panic", "error", panicErr)
+			os.Exit(1)
+		}
+
+		if err != nil {
+			log.Error("Got an error", "error", err)
+			os.Exit(1)
+		}
+	}()
 
 	// init config
 	cfg, err := config.New(configName)
 	if err != nil {
-		log.WithError(err).Fatal("Unable to parse config")
+		err = fmt.Errorf("unable to parse config: %w", err)
+		return
 	}
 	log.Info("Config parsed")
 
 	// init DB
 	db, err := bolt.New(cfg.GetString("db.path"), cfg.GetDuration("db.timeout"))
 	if err != nil {
-		log.WithError(err).Fatal("Unable to init DB")
+		err = fmt.Errorf("unable to init DB: %w", err)
+		return
 	}
 	log.Info("DB initiated")
 	defer db.Close(false)
 
 	// create bot
-	bot, err := telegram.NewBot(cfg, log)
+	bot, err := telegram.NewBot(cfg, log, slogLevel)
 	if err != nil {
-		log.WithError(err).Fatal("Unable to create bot")
+		err = fmt.Errorf("unable to create bot: %w", err)
+		return
 	}
 	log.Info("Bot created")
 
@@ -94,11 +109,11 @@ func main() {
 	// watch context and syscalls
 	select {
 	case sig := <-gracefulStop:
-		log.Warnf("Caught sig %+v, stopping the app", sig)
+		log.Warn("Caught a signal, stopping the app", "signal", sig)
 		cancel()
 		return
 	case <-ctx.Done():
-		log.Warnf("Context closed (%s), exiting application", ctx.Err())
+		log.Warn("Context closed, exiting application", "error", ctx.Err())
 		return
 	}
 }

@@ -7,20 +7,19 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slog"
 )
 
 // Bot describes Telegram bot
 type Bot struct {
 	api *tgbotapi.BotAPI
 	cfg *viper.Viper
-	log *logrus.Logger
+	log *slog.Logger
 }
 
 // NewBot creates new instance of Bot
-func NewBot(cfg *viper.Viper, log *logrus.Logger) (*Bot, error) {
+func NewBot(cfg *viper.Viper, log *slog.Logger, logLevel slog.Level) (*Bot, error) {
 	if cfg == nil {
 		return nil, errors.New("empty config")
 	}
@@ -29,13 +28,14 @@ func NewBot(cfg *viper.Viper, log *logrus.Logger) (*Bot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to Telegram: %w", err)
 	}
-	_ = tgbotapi.SetLogger(log.WithField("source", "telegram-api"))
+
+	_ = tgbotapi.SetLogger(slog.NewLogLogger(log.With("source", "telegram-api").Handler(), logLevel))
 	if cfg.GetBool("telegram.debug") {
 		log.Debug("Enabling debug mode for bot")
 		api.Debug = true
 	}
 
-	log.Debugf("Authorized on account %s", api.Self.UserName)
+	log.Debug("Authorized successfully", "account", api.Self.UserName)
 	return &Bot{api: api, cfg: cfg, log: log}, nil
 }
 
@@ -56,7 +56,7 @@ func (b *Bot) listen(ctx context.Context, updates tgbotapi.UpdatesChannel) {
 	for {
 		select {
 		case <-ctx.Done():
-			b.log.Warning("Context closed - stopping listening to the updates: %w", ctx.Err())
+			b.log.Warn("Context closed - stopping listening to the updates", "error", ctx.Err())
 			return
 		case u := <-updates:
 			if u.Message == nil { // ignore any non-Message updates
@@ -67,7 +67,7 @@ func (b *Bot) listen(ctx context.Context, updates tgbotapi.UpdatesChannel) {
 			case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.start")):
 				go b.hello(u.Message)
 			case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.help")):
-				log.WithField("user_id", u.Message.From.ID).Debug("Got help request")
+				slog.With("user_id", u.Message.From.ID).Debug("Got help request")
 				go b.help(u.Message)
 				// case strings.HasPrefix(u.Message.Text, b.cfg.GetString("commands.your_command")):
 				// go b.yourBotAction(u.Message)
@@ -85,7 +85,7 @@ func (b *Bot) help(msg *tgbotapi.Message) {
 }
 
 func (b *Bot) reply(chatID int64, msgID int, text string) {
-	log.WithField("chat_id", chatID).WithField("msg_id", msgID).Debug("Sending reply")
+	slog.With("chat_id", chatID).With("msg_id", msgID).Debug("Sending reply")
 	msg := tgbotapi.NewMessage(chatID, fmt.Sprint(text))
 	if msgID != 0 {
 		msg.ReplyToMessageID = msgID
@@ -93,7 +93,7 @@ func (b *Bot) reply(chatID int64, msgID int, text string) {
 	msg.ParseMode = tgbotapi.ModeMarkdown
 
 	if _, err := b.api.Send(msg); err != nil {
-		log.Errorf("Unable to send the message: %v", err)
+		slog.Error("Unable to send the message", "error", err)
 		return
 	}
 }
