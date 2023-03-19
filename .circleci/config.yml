@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/golang:1.20
+      - image: cimg/go:1.20
     working_directory: /go/src/github.com/nezorflame/example-telegram-bot
     steps:
       - checkout
