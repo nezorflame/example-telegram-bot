@@ -8,8 +8,8 @@ timeout = 60
 debug = false
 
 [commands]
-start = "/start"
-help = "/help"
+start = "start"
+help = "help"
 
 [messages]
 hello = "Hello!"
