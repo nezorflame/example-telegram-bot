@@ -3,7 +3,6 @@ jobs:
   build:
     docker:
       - image: cimg/go:1.20
-    working_directory: /go/src/github.com/nezorflame/example-telegram-bot
     steps:
       - checkout
       - restore_cache:
@@ -17,4 +16,4 @@ jobs:
       - save_cache:
           key: module-cache-{{ checksum "go.mod" }}
           paths:
-            - /go/pkg/mod/cache/download/
+            - $HOME/go/pkg/mod/cache/download/
