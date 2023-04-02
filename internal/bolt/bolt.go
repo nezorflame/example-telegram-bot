@@ -22,13 +22,18 @@ var (
 // DB describes local BoltDB database
 type DB struct {
 	b       *bbolt.DB
+	log     *slog.Logger
 	timeout time.Duration
 }
 
 // New creates new instance of bolt DB
-func New(path string, timeout time.Duration) (*DB, error) {
+func New(path string, timeout time.Duration, log *slog.Logger) (*DB, error) {
+	if log == nil {
+		return nil, errors.New("empty logger")
+	}
+
 	// open connection to the DB
-	slog.With("path", path).With("timeout", timeout).Debug("Creating DB connection")
+	log.With("path", path).With("timeout", timeout).Debug("Creating DB connection")
 	opts := bbolt.DefaultOptions
 	if timeout > 0 {
 		opts.Timeout = timeout
@@ -39,7 +44,7 @@ func New(path string, timeout time.Duration) (*DB, error) {
 	}
 
 	// create global bucket if it doesn't exist yet
-	slog.With("bucket", string(bucketName)).Debug("Setting the default bucket")
+	log.With("bucket", string(bucketName)).Debug("Setting the default bucket")
 	err = b.Update(func(tx *bbolt.Tx) error {
 		_, bErr := tx.CreateBucketIfNotExists(bucketName)
 		return bErr
@@ -49,19 +54,19 @@ func New(path string, timeout time.Duration) (*DB, error) {
 	}
 
 	// return the DB
-	db := &DB{b: b, timeout: timeout}
-	slog.Debug("DB initiated")
+	db := &DB{b: b, log: log, timeout: timeout}
+	db.log.Debug("DB initiated")
 	return db, nil
 }
 
 // Close closes the DB
 func (db *DB) Close(delete bool) error {
-	slog.Debug("Closing the DB")
+	db.log.Debug("Closing the DB")
 	path := db.b.Path()
 	done := make(chan error)
 	go func() {
 		done <- db.b.Close()
-		slog.Debug("DB closed OK")
+		db.log.Debug("DB closed OK")
 		close(done)
 	}()
 	timer := time.NewTimer(db.timeout)
@@ -83,7 +88,7 @@ func (db *DB) Close(delete bool) error {
 // Keys returns a list of available keys in the global bucket, sorted alphabetically
 func (db *DB) Keys() ([]string, error) {
 	var keys []string
-	slog.Debug("Getting the list of DB current keys")
+	db.log.Debug("Getting the list of DB current keys")
 	err := db.b.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -106,7 +111,7 @@ func (db *DB) Keys() ([]string, error) {
 // Get acquires value from DB by provided key
 func (db *DB) Get(key string) ([]byte, error) {
 	var value []byte
-	slog.With("key", key).Debug("Getting value from DB")
+	db.log.With("key", key).Debug("Getting value from DB")
 	err := db.b.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -125,13 +130,13 @@ func (db *DB) Get(key string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get value for key '%s' from DB: %w", key, err)
 	}
-	slog.With("key", key).Debug("Got the value")
+	db.log.With("key", key).Debug("Got the value")
 	return value, nil
 }
 
 // Put sets/updates the value in DB by provided bucket and key
 func (db *DB) Put(key string, val []byte) error {
-	slog.With("key", key).Debug("Saving the value to DB")
+	db.log.With("key", key).Debug("Saving the value to DB")
 	err := db.b.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -147,7 +152,7 @@ func (db *DB) Put(key string, val []byte) error {
 
 // Delete removes the value from DB by provided bucket and key
 func (db *DB) Delete(key string) error {
-	slog.With("key", key).Debug("Deleting from DB")
+	db.log.With("key", key).Debug("Deleting from DB")
 	err := db.b.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {

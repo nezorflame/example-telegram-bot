@@ -24,20 +24,21 @@ This bot uses:
 
 ## Structure
 
-This project mostly adheres to the [Project Layout](https://github.com/golang-standards/project-layout) structure:
+This project mostly adheres to the [Project Layout](https://github.com/golang-standards/project-layout) structure, excluding `pkg` folders.
 
-- `internal/pkg` holds the private libraries:
-  - `config` for configuration
-  - `bolt` for database (using BoltDB)
-  - `file` for file and network helpers
-- `pkg` holds the public libraries (mainly `telegram` package with bot implementation)
+`internal` package holds the private libraries:
+
+- `config` for configuration
+- `bolt` for database (using BoltDB)
+- `file` for file and network helpers
+- `telegram` package with bot implementation
 
 ## Customization
 
 To add another custom command handler, you can:
 
 - add a command to `config.toml` (and also a corresponding message, if required)
-- edit `internal/pkg`
+- edit `internal` packages
 
 ## License
 
