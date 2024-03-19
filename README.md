@@ -1,4 +1,4 @@
-# example-telegram-bot ![Workflow status](https://github.com/nezorflame/example-telegram-bot/actions/workflows/go.yml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/example-telegram-bot)](https://goreportcard.com/report/github.com/nezorflame/example-telegram-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/example-telegram-bot.svg)](https://golangci.com/r/github.com/nezorflame/example-telegram-bot)
+# example-telegram-bot [![Workflow status](https://github.com/nezorflame/example-telegram-bot/actions/workflows/go.yml/badge.svg)](https://github.com/nezorflame/example-telegram-bot/actions/workflows/go.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/example-telegram-bot)](https://goreportcard.com/report/github.com/nezorflame/example-telegram-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/example-telegram-bot.svg)](https://golangci.com/r/github.com/nezorflame/example-telegram-bot)
 
 Example bot template for Telegram.
 
