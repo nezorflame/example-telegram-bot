@@ -1,4 +1,4 @@
-# example-telegram-bot [![CircleCI](https://circleci.com/gh/nezorflame/example-telegram-bot/tree/main.svg?style=svg)](https://circleci.com/gh/nezorflame/example-telegram-bot/tree/main) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/example-telegram-bot)](https://goreportcard.com/report/github.com/nezorflame/example-telegram-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/example-telegram-bot.svg)](https://golangci.com/r/github.com/nezorflame/example-telegram-bot) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot?ref=badge_shield)
+# example-telegram-bot ![Workflow status](https://github.com/nezorflame/example-telegram-bot/actions/workflows/go.yml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/example-telegram-bot)](https://goreportcard.com/report/github.com/nezorflame/example-telegram-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/example-telegram-bot.svg)](https://golangci.com/r/github.com/nezorflame/example-telegram-bot)
 
 Example bot template for Telegram.
 
@@ -10,7 +10,7 @@ With this type of setup all you need to do is:
 - replace the module and bot name to your own
 - run `make init` to set up the project and its dependencies
 - add required code
-- set up the environment or your dotenv file for your needs
+- set up the environment or your `.env` file for your needs
 - modify `.service` file for systemd to manage your bot
 - deploy your bot to the server of choice!
 
@@ -38,7 +38,7 @@ This project mostly adheres to the [Project Layout](https://github.com/golang-st
 
 To add another custom command handler, you can:
 
-- add a command to `config.toml` (and also a corresponding message, if required)
+- add a command to `.env` file (and also a corresponding message, if required)
 - edit `internal` packages
 
 ## License
