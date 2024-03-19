@@ -5,49 +5,43 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/joho/godotenv"
+	"github.com/kelseyhightower/envconfig"
 )
 
-const (
-	defaultDBPath          = "./bolt.db"
-	defaultDBTimeout       = time.Second
-	defaultTelegramTimeout = 60
-	defaultTelegramDebug   = false
-)
+type Config struct {
+	TelegramToken   string        `required:"true" split_words:"true"`
+	TelegramTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
 
-var mandatoryParams = []string{
-	"telegram.token",
-	"commands.start",
-	"commands.help",
-	"messages.hello",
-	"messages.help",
-	"errors.unknown",
+	DBPath    string        `required:"true" split_words:"true" default:"./bolt.db"`
+	DBTimeout time.Duration `required:"true" split_words:"true" default:"1s"`
+
+	CmdStart string `required:"true" split_words:"true"`
+	CmdHelp  string `required:"true" split_words:"true"`
+
+	MsgHello      string `required:"true" split_words:"true"`
+	MsgHelp       string `required:"true" split_words:"true"`
+	MsgErrUnknown string `required:"true" split_words:"true"`
 }
 
-// New creates new viper config instance
-func New(name string) (*viper.Viper, error) {
-	if name == "" {
-		return nil, errors.New("empty config name")
+// New creates new Config instance from environment
+func New(envFile string) (*Config, error) {
+	// create config and set defaults
+	cfg := &Config{}
+
+	// load dotenv file first, if it's presented
+	if envFile != "" {
+		if err := godotenv.Load(envFile); err != nil {
+			return nil, fmt.Errorf("unable to load dotenv files: %w", err)
+		}
 	}
 
-	cfg := viper.New()
-
-	cfg.SetConfigName(name)
-	cfg.SetConfigType("toml")
-	cfg.AddConfigPath("$HOME/.config")
-	cfg.AddConfigPath("/etc")
-	cfg.AddConfigPath(".")
-
-	if err := cfg.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("unable to read config: %w", err)
+	// fill config from env
+	if err := envconfig.Process("", cfg); err != nil {
+		return nil, fmt.Errorf("unable to process config: %w", err)
 	}
-	cfg.WatchConfig()
 
-	cfg.SetDefault("db.path", defaultDBPath)
-	cfg.SetDefault("db.timeout", defaultDBTimeout)
-	cfg.SetDefault("telegram.timeout", defaultTelegramTimeout)
-	cfg.SetDefault("telegram.debug", defaultTelegramDebug)
-
+	// validate config
 	if err := validateConfig(cfg); err != nil {
 		return nil, fmt.Errorf("unable to validate config: %w", err)
 	}
@@ -55,23 +49,17 @@ func New(name string) (*viper.Viper, error) {
 	return cfg, nil
 }
 
-func validateConfig(cfg *viper.Viper) error {
+func validateConfig(cfg *Config) error {
 	if cfg == nil {
 		return errors.New("config is nil")
 	}
 
-	for _, p := range mandatoryParams {
-		if cfg.Get(p) == nil {
-			return fmt.Errorf("empty config value '%s'", p)
-		}
+	if cfg.DBTimeout <= 0 {
+		return errors.New("param DBTimeout should be greater than 0")
 	}
 
-	if cfg.GetDuration("db.timeout") <= 0 {
-		return errors.New("'db.timeout' should be greater than 0")
-	}
-
-	if cfg.GetDuration("telegram.timeout") <= 0 {
-		return errors.New("'telegram.timeout' should be greater than 0")
+	if cfg.TelegramTimeout <= 0 {
+		return errors.New("param TelegramTimeout should be greater than 0")
 	}
 
 	return nil

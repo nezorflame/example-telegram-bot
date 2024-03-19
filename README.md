@@ -8,19 +8,20 @@ With this type of setup all you need to do is:
 
 - create a project from the template and `git clone` it
 - replace the module and bot name to your own
+- run `make init` to set up the project and its dependencies
 - add required code
-- change the config file to your needs
+- set up the environment or your dotenv file for your needs
 - modify `.service` file for systemd to manage your bot
-- deploy your bot to the server of choice, using modified config and service files
+- deploy your bot to the server of choice!
 
 ## Dependencies
 
 This bot uses:
 
-- [tgbotapi](https://pkg.go.dev/github.com/go-telegram-bot-api/telegram-bot-api/v5) package to work with Telegram API
-- [bbolt](https://pkg.go.dev/go.etcd.io/bbolt) for local database
-- [viper](https://pkg.go.dev/github.com/spf13/viper) for configuration
-- [slog](https://pkg.go.dev/golang.org/x/exp/slog) for logging
+- [telebot](https://pkg.go.dev/gopkg.in/telebot.v3) package to work with Telegram API
+- [bolt](https://pkg.go.dev/go.etcd.io/bbolt) for the database
+- [envconfig](https://pkg.go.dev/github.com/kelseyhightower/envconfig) + [godotenv](https://pkg.go.dev/github.com/joho/godotenv) for the configuration
+- [slog](https://pkg.go.dev/log/slog) for the logging
 
 ## Structure
 

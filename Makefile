@@ -1,5 +1,4 @@
 CMD:=example-telegram-bot
-MODULE:=github.com/nezorflame/$(CMD)
 PKG_LIST:=$(shell go list -f '{{.Dir}}' ./...)
 GIT_HASH?=$(shell git log --format="%h" -n 1 2> /dev/null)
 GIT_BRANCH?=$(shell git branch 2> /dev/null | grep '*' | cut -f2 -d' ')
@@ -15,6 +14,18 @@ BUILD_TS:=$(shell date +%FT%T%z)
 
 PWD:=$(PWD)
 export PATH:=$(PWD)/bin:$(PATH)
+
+# init the project (do this once!)
+.PHONY: init
+init: workspace deps tools
+
+# setup Go module workspace
+.PHONY: workspace
+workspace:
+	$(info #Setting up the workspace...)
+	go work init
+	go work use .
+	go work use tools
 
 # install project dependencies
 .PHONY: deps
@@ -38,15 +49,10 @@ generate:
 	$(info #Generating code...)
 	go generate ./...
 
-.PHONY: imports
-imports:
-	$(info #Formatting code imports...)
-	gosimports -local $(MODULE) -w $(PKG_LIST)
-
 .PHONY: format
-format: imports
+format:
 	$(info #Formatting code...)
-	gofumpt -w $(PKG_LIST)
+	golangci-lint run --fix ./...
 
 .PHONY: refresh
 refresh: generate format deps
@@ -84,7 +90,7 @@ install: deps
 .PHONY: tools
 tools:
 	$(info #Installing tools...)
-	cd tools && go generate -tags tools
+	cd tools && go mod tidy && go generate -tags tools
 
 # run linter
 .PHONY: lint

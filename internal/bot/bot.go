@@ -1,28 +1,27 @@
 package bot
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"strconv"
+	"log/slog"
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	tele "gopkg.in/telebot.v3"
+
 	"github.com/nezorflame/example-telegram-bot/internal/bolt"
-	"github.com/spf13/viper"
-	"golang.org/x/exp/slog"
+	"github.com/nezorflame/example-telegram-bot/internal/config"
 )
 
 type bot struct {
-	api *tgbotapi.BotAPI
+	tg  *tele.Bot
+	cfg *config.Config
 	db  *bolt.DB
-
-	cfg *viper.Viper
 	log *slog.Logger
 }
 
 // New creates new instance of Bot
-func New(cfg *viper.Viper, log *slog.Logger, logLevel slog.Level, db *bolt.DB) (*bot, error) {
+func New(cfg *config.Config, log *slog.Logger, db *bolt.DB) (*bot, error) {
+	// validate
 	if cfg == nil {
 		return nil, errors.New("empty config")
 	}
@@ -33,99 +32,86 @@ func New(cfg *viper.Viper, log *slog.Logger, logLevel slog.Level, db *bolt.DB) (
 		return nil, errors.New("empty DB")
 	}
 
-	api, err := tgbotapi.NewBotAPI(cfg.GetString("telegram.token"))
+	// create bot
+	log.Debug("Connecting to Telegram...")
+	tg, err := tele.NewBot(tele.Settings{
+		Token:  cfg.TelegramToken,
+		Poller: &tele.LongPoller{Timeout: cfg.TelegramTimeout},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to Telegram: %w", err)
 	}
+	log.Debug("Connection established")
 
-	_ = tgbotapi.SetLogger(slog.NewLogLogger(log.With("source", "telegram-api").Handler(), logLevel))
-	if cfg.GetBool("telegram.debug") {
-		log.Debug("Enabling debug mode for bot")
-		api.Debug = true
-	}
+	b := &bot{tg: tg, cfg: cfg, db: db, log: log}
 
-	log.Debug("Authorized successfully", "account", api.Self.UserName)
-	return &bot{api: api, db: db, cfg: cfg, log: log}, nil
+	// register handlers
+	b.tg.Handle(cfg.CmdStart, func(teleCtx tele.Context) error {
+		return b.hello(teleCtx)
+	})
+	b.tg.Handle(cfg.CmdHelp, func(teleCtx tele.Context) error {
+		return b.help(teleCtx)
+	})
+	b.tg.Handle(tele.OnText, func(teleCtx tele.Context) error {
+		return b.handle(teleCtx)
+	})
+
+	// return the bot
+	log.Debug("Authorized successfully", "account", tg.Me.Username)
+	return b, nil
 }
 
-// Start starts to listen the bot updates channel
-func (b *bot) Start(ctx context.Context) {
-	update := tgbotapi.NewUpdate(0)
-	update.Timeout = b.cfg.GetInt("telegram.timeout")
-	updates := b.api.GetUpdatesChan(update)
-	go b.listen(ctx, updates)
+// Start starts to listen the bot updates channel.
+func (b *bot) Start() {
+	b.tg.Start()
 }
 
 // Stop stops the bot
 func (b *bot) Stop() {
-	b.api.StopReceivingUpdates()
+	b.tg.Stop()
 }
 
-func (b *bot) listen(ctx context.Context, updates tgbotapi.UpdatesChannel) {
-	for {
-		select {
-		case <-ctx.Done():
-			b.log.Warn("Context closed - stopping listening to the updates", "error", ctx.Err())
-			return
-		case u := <-updates:
-			// ignore any non-Message updates
-			if u.Message == nil {
-				continue
-			}
+func (b *bot) hello(teleCtx tele.Context) error {
+	b.log.With("chat_id", teleCtx.Chat().ID, "msg_id", teleCtx.Message().ID).Debug("Sending hello reply")
+	return teleCtx.Send(b.cfg.MsgHello)
+}
 
-			// ignore group messages without bot mention
-			// or without response to its previous message
-			if !u.FromChat().IsPrivate() {
-				if !b.isBotMention(u.Message) && !b.isReplyToBot(u.Message) {
-					continue
-				}
-			}
+func (b *bot) help(teleCtx tele.Context) error {
+	b.log.With("chat_id", teleCtx.Chat().ID, "msg_id", teleCtx.Message().ID).Debug("Sending help reply")
+	return teleCtx.Send(b.cfg.MsgHelp)
+}
 
-			switch {
-			case strings.EqualFold(u.Message.Command(), b.cfg.GetString("commands.start")):
-				b.log.With("user_id", u.Message.From.ID).Debug("Got /start command")
-				fallthrough
-			case strings.EqualFold(u.Message.Command(), b.cfg.GetString("commands.help")):
-				b.log.With("user_id", u.Message.From.ID).Debug("Got /help command")
-				go b.help(u.Message)
-			default:
-				b.log.With("user_id", u.Message.From.ID).Debug("Got a message")
-				go b.parseChatMessage(ctx, u.Message)
-			}
+func (b *bot) handle(teleCtx tele.Context) error {
+	// ignore any non-Message updates
+	if teleCtx.Message() == nil {
+		return nil
+	}
+
+	// ignore group messages without bot mention
+	// or without response to its previous message
+	if !teleCtx.Message().Private() {
+		if !b.isBotMention(teleCtx) && !b.isReplyToBot(teleCtx) {
+			return nil
 		}
 	}
+
+	return b.parseChatMessage(teleCtx)
 }
 
-func (b *bot) help(msg *tgbotapi.Message) {
-	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.help"))
+func (b *bot) parseChatMessage(teleCtx tele.Context) error {
+	log := b.log.With("chat_id", teleCtx.Chat().ID, "user_id", teleCtx.Sender().ID)
+	log.Debug("Parsing new chat message", "message", teleCtx.Message().Text)
+	return nil
 }
 
-func (b *bot) reply(chatID int64, msgID int, text string) {
-	b.log.With("chat_id", chatID).With("msg_id", msgID).Debug("Sending reply")
-	msg := tgbotapi.NewMessage(chatID, fmt.Sprint("", text))
-	if msgID != 0 {
-		msg.ReplyToMessageID = msgID
-	}
-	msg.ParseMode = tgbotapi.ModeMarkdown
-
-	if _, err := b.api.Send(msg); err != nil {
-		b.log.Error("Unable to send the message", "error", err)
-		return
-	}
+func (b *bot) isBotMention(teleCtx tele.Context) bool {
+	return strings.Contains(teleCtx.Message().Text, b.tg.Me.Username)
 }
 
-func (b *bot) parseChatMessage(ctx context.Context, msg *tgbotapi.Message) {
-	log := b.log.With("chat_id", strconv.FormatInt(msg.Chat.ID, 10), "user_id", msg.From.ID)
-	log.DebugCtx(ctx, "Parsing new chat message", "message", msg.Text)
-}
-
-func (b *bot) isBotMention(msg *tgbotapi.Message) bool {
-	return strings.Contains(msg.Text, b.api.Self.UserName)
-}
-
-func (b *bot) isReplyToBot(msg *tgbotapi.Message) bool {
-	if msg.ReplyToMessage == nil || msg.ReplyToMessage.From == nil {
+func (b *bot) isReplyToBot(teleCtx tele.Context) bool {
+	reply := teleCtx.Message().ReplyTo
+	if reply == nil || reply.Sender == nil {
 		return false
 	}
-	return msg.ReplyToMessage.From.ID == b.api.Self.ID
+	return reply.Sender.ID == b.tg.Me.ID
 }

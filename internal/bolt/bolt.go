@@ -3,12 +3,12 @@ package bolt
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
 	"time"
 
 	"go.etcd.io/bbolt"
-	"golang.org/x/exp/slog"
 )
 
 // Package vars

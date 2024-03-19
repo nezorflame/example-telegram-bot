@@ -4,11 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/nezorflame/example-telegram-bot/internal/bolt"
 	"github.com/nezorflame/example-telegram-bot/internal/bot"
@@ -17,29 +16,36 @@ import (
 
 // Config flags.
 var (
-	configName string
-	slogLevel  slog.Level
+	envFile   string
+	slogLevel slog.Level
 )
 
 // Init the flags.
 func init() {
-	flag.StringVar(&configName, "config", "config", "Config file name")
-	logLevel := flag.String("log-level", "INFO", "Logrus log level (DEBUG, WARN, etc.)")
+	var err error
+	defer func() {
+		if err != nil {
+			flag.Usage()
+			os.Exit(1)
+		}
+	}()
+
+	flag.StringVar(&envFile, "env", "", "Config file name")
+	logLevel := flag.String("log", "INFO", "Log level (DEBUG, WARN, etc.)")
 	flag.Parse()
-	if logLevel == nil {
-		flag.PrintDefaults()
-		os.Exit(1)
+
+	// validate log level, if set
+	if err = slogLevel.UnmarshalText([]byte(*logLevel)); err != nil {
+		err = fmt.Errorf("unable to marshal log level: %w", err)
+		return
 	}
 
-	if err := slogLevel.UnmarshalText([]byte(*logLevel)); err != nil {
-		fmt.Printf("Log level '%s' is incorrect: %s\n", *logLevel, err)
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-
-	if configName == "" {
-		flag.PrintDefaults()
-		os.Exit(1)
+	// validate dotenv file, if set
+	if envFile != "" {
+		if _, err = os.Stat(envFile); err != nil {
+			err = fmt.Errorf("unable to read dotenv file: %w", err)
+			return
+		}
 	}
 }
 
@@ -49,11 +55,11 @@ func main() {
 	defer cancel()
 
 	// init logger
-	slogOptions := slog.HandlerOptions{
+	slogOpts := &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slogLevel,
 	}
-	log := slog.New(slogOptions.NewTextHandler(os.Stdout))
+	log := slog.New(slog.NewTextHandler(os.Stdout, slogOpts))
 	log.Info("Launching the bot...")
 
 	// error reporting
@@ -71,7 +77,7 @@ func main() {
 	}()
 
 	// init config
-	cfg, err := config.New(configName)
+	cfg, err := config.New(envFile)
 	if err != nil {
 		err = fmt.Errorf("unable to parse config: %w", err)
 		return
@@ -79,11 +85,7 @@ func main() {
 	log.Info("Config parsed")
 
 	// init DB
-	db, err := bolt.New(
-		cfg.GetString("db.path"),
-		cfg.GetDuration("db.timeout"),
-		log,
-	)
+	db, err := bolt.New(cfg.DBPath, cfg.DBTimeout, log)
 	if err != nil {
 		err = fmt.Errorf("unable to init DB: %w", err)
 		return
@@ -91,8 +93,8 @@ func main() {
 	log.Info("DB initiated")
 	defer db.Close(false)
 
-	// create tgBot
-	tgBot, err := bot.New(cfg, log, slogLevel, db)
+	// create Telegram bot
+	tgBot, err := bot.New(cfg, log, db)
 	if err != nil {
 		err = fmt.Errorf("unable to create bot: %w", err)
 		return
@@ -101,19 +103,19 @@ func main() {
 
 	// init graceful stop chan
 	log.Debug("Initiating system signal watcher")
-	gracefulStop := make(chan os.Signal, 1)
-	signal.Notify(gracefulStop, syscall.SIGTERM)
-	signal.Notify(gracefulStop, syscall.SIGINT)
+	graceful := make(chan os.Signal, 1)
+	signal.Notify(graceful, syscall.SIGTERM)
+	signal.Notify(graceful, syscall.SIGINT)
 
 	// start the bot
 	log.Info("Starting the bot")
-	tgBot.Start(ctx)
+	tgBot.Start()
 	log.Info("Started the bot, listening to the updates...")
 	defer tgBot.Stop()
 
 	// watch context and syscalls
 	select {
-	case sig := <-gracefulStop:
+	case sig := <-graceful:
 		log.Warn("Caught a signal, stopping the app", "signal", sig)
 		cancel()
 		return
