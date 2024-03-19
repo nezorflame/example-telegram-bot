@@ -19,8 +19,7 @@ go.work.sum
 .idea/
 .vscode/
 bin/
-vendor/
-config.toml
-debug
-.DS_Store
+__debug_bin*
+.env
 *.db
+.DS_Store
