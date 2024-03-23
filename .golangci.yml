@@ -1,73 +1,109 @@
 # More info on config here: https://github.com/golangci/golangci-lint#config-file
 run:
-  deadline: 10m
+  timeout: 10m
   issues-exit-code: 1
   tests: true
-  skip-dirs:
+
+output:
+  formats:
+    - format: json
+      path: stderr
+    - format: checkstyle
+      path: report.xml
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  gocritic:
+    disabled-checks:
+      - exitAfterDefer
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#var-naming
+      - name: var-naming
+        disabled: true
+  gomodguard:
+    blocked:
+      modules:
+        - github.com/pkg/errors:
+            recommendations:
+              - errors
+            reason: "`errors` is the official error helper library."
+        - github.com/go-errors/errors:
+            recommendations:
+              - errors
+            reason: "`errors` is the official error helper library."
+      local_replace_directives: true
+
+  gci:
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/nezorflame/example-telegram-bot) # Custom section: groups all imports with the specified Prefix.
+      # - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
+      # - dot # Dot section: contains all dot imports. This section is not present unless explicitly enabled.
+    skip-generated: false
+    custom-order: true
+  gofumpt:
+    module-path: github.com/nezorflame/example-telegram-bot
+    extra-rules: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - errorlint
+    - gocheckcompilerdirectives
+    - goconst
+    - gocritic
+    - gomodguard
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - makezero
+    - nilnil
+    - nolintlint
+    - revive
+    - staticcheck
+    - tenv
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - gci # autofixable
+    - gofumpt # autofixable
+    - misspell # autofixable
+    - whitespace # autofixable
+    # - godox # enable before pushing to avoid TODOs
+
+issues:
+  # Which dirs to exclude: issues from them won't be reported.
+  # Can use regexp here: `generated.*`, regexp is applied on full path,
+  # including the path prefix if one is set.
+  # Default dirs are skipped independently of this option's value (see exclude-dirs-use-default).
+  # "/" will be replaced by current OS file path separator to properly work on Windows.
+  # Default: []
+  exclude-dirs:
     - bin
     - vendor
     - var
     - tmp
     - internal/generated
-
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
-linters-settings:
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  govet:
-    check-shadowing: true
-  dupl:
-    threshold: 100
-
-linters:
-  disable-all: true
-  enable:
-    - revive
-    - govet
-    - errcheck
-    - ineffassign
-    - typecheck
-    - goconst
-    - gosec
-    - goimports
-    - gosimple
-    - unused
-    - staticcheck
-    - makezero
-    - whitespace
-    # - dupl # - it's very slow, enable if you really know why you need it
-
-issues:
-  # Independently from option `exclude` we use default exclude patterns,
-  # it can be disabled by this option. To list all
-  # excluded by default patterns execute `golangci-lint run --help`.
-  # Default value for this option is true.
-  exclude-use-default: false
   # List of regexps of issue texts to exclude, empty list by default.
   # But independently from this option we use default exclude patterns,
   # it can be disabled by `exclude-use-default: false`. To list all
   # excluded by default patterns execute `golangci-lint run --help`
   exclude:
-    # _ instead of err checks
-    - G104
-    # Close() on types - make sure to know when it's OK to ignore!
-    - G307
-    # for "public interface + private struct implementation" cases only!
-    - "unexported-return: exported func .* returns unexported type .*, which can be annoying to use"
-    # can be removed in the development phase
-    - (comment on exported (method|function|type|const|var)|should have( a package)? comment|comment should be of the form)
-    # not for the active development - can be removed in the stable phase
-    - should have a package comment, unless it's in another file for this package
-    - don't use an underscore in package name
-    # errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
-    - should check returned error before deferring
-    - "Error return value of `.*(Close|Remove)` is not checked"
-    - "string `test` has * occurrences, make it a constant"
+    # error shadowing is mostly OK
+    - 'shadow: declaration of "err"'
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
     # Exclude some linters from running on tests files.
